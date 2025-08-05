@@ -12,11 +12,6 @@ N_IN_FEATURES = 15
 N_OUT_FEATURES = 15
 fz = 10
 agent_dict = {'car':1, 'bus':2, 'truck':3, 'motorcycle':4, 'bicycle':5, 'tricycle':6, 'pedestrian':7}
-normalize_dict = {'TianJin':{'x_min':-24.1609, 'x_max':55.5728, 'y_min':-8.9886, 'y_max':40.0838}, \
-                  'ChangChun':{'x_min':-95.24867, 'x_max':54.0649, 'y_min':-82.8118, 'y_max':76.3586},\
-                  'XiAn':{'x_min':-95.8782, 'x_max':75.5598, 'y_min':-20.9430, 'y_max':75.3351}, \
-                  'ChongQing':{'x_min':-45.1188, 'x_max':51.0306, 'y_min':-26.4988, 'y_max':64.2722}
-}
 
 def create_directories(data_folder):
     root = f'./data/{data_folder}'
@@ -70,25 +65,11 @@ def find_neighboring_nodes(ped_df, veh_df, frame, id0, x0, y0, upper_limit=14):
     dist_sorted = sorted(dist)
     del dist_sorted[upper_limit:]
     return dist_sorted
-
-def normalize_x(x):
-    norm_dict = normalize_dict[City]
-    x_min, x_max = norm_dict['x_min'], norm_dict['x_max']
-    out = round(2 * (x - x_min) / (x_max - x_min) - 1, 4)
-    return out
-
-def normalize_y(y):
-    norm_dict = normalize_dict[City]
-    y_min, y_max = norm_dict['y_min'], norm_dict['y_max']
-    out = round(2 * (y - y_min) / (y_max - y_min) - 1, 4)
-    return out
     
 def get_input_features(df, frame_start, frame_end):
     dfx = df[(df.frame_id >= frame_start) & (df.frame_id <= frame_end)]
     x = list(map(lambda x:round(x,4), dfx.x.values))
     y = list(map(lambda x:round(x,4), dfx.y.values))
-    # x = list(map(normalize_x, x))
-    # y = list(map(normalize_y, y))
     # 对xy坐标做归一化
     vx = list(map(lambda x:round(x,4), dfx.vx.values))
     vy = list(map(lambda x:round(x,4), dfx.vy.values))
@@ -113,8 +94,6 @@ def get_target_features(df, frame_start, frame_end, n_features):
     frame_offset = first_frame - frame_start
     x = list(map(lambda x:round(x,4), dfx.x.values))
     y = list(map(lambda x:round(x,4), dfx.y.values))
-    # x = list(map(normalize_x, x))
-    # y = list(map(normalize_y, y))
     vx = list(map(lambda x:round(x,4), dfx.vx.values))
     vy = list(map(lambda x:round(x,4), dfx.vy.values))
     ax = list(map(lambda x:round(x,4), dfx.ax.values))
@@ -147,8 +126,6 @@ def get_adjusted_features(df, frame_start, frame_end, n_features, trackId = -1):
     frame_offset = first_frame - frame_start
     x = list(map(lambda x:round(x,4), dfx.x.values))
     y = list(map(lambda x:round(x,4), dfx.y.values))
-    # x = list(map(normalize_x, x))
-    # y = list(map(normalize_y, y))
     vx = list(map(lambda x:round(x,4), dfx.vx.values))
     vy = list(map(lambda x:round(x,4), dfx.vy.values))
     ax = list(map(lambda x:round(x,4), dfx.ax.values))
@@ -339,10 +316,6 @@ if __name__ == "__main__":
                 veh_tracks = pd.read_csv(f'{sub_folder}/{name}')
             elif name.startswith('Traffic'):
                 trafficlight = pd.read_csv(f'{sub_folder}/{name}')
-            else:
-                if City != 'Tianjin':
-                    print(f'{name}数据集匹配错误')
-                    exit(0)
         all_frame = max([max(ped_tracks['frame_id'].values), max(veh_tracks['frame_id'].values)]) + 1
         all_timestamp = max([max(ped_tracks['timestamp_ms'].values), max(veh_tracks['timestamp_ms'].values)])
          # 生成交通信号灯的动态变化字典 键为时间区间左闭右开 值为信号灯的离散状态为float类型
