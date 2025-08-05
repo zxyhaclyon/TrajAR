@@ -403,7 +403,7 @@ class TrajAR_Decoder(nn.Module):
         
         return x
 
-class ModVAR(nn.Module):
+class TrajAR(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.node_num = args.node_num
