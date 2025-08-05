@@ -10,7 +10,7 @@ from config.SinD_Tianjin_parser import Tianjin_InitArgs
 from config.SinD_Xian_parser import Xian_InitArgs
 from config.inD_Location1_parser import Location1_InitArgs
 from config.inD_Location2_parser import Location2_InitArgs
-from model import ModVAR
+from model import TrajAR
 import copy
 from torch.optim.lr_scheduler import ExponentialLR
 import nni
@@ -255,7 +255,7 @@ if __name__ == '__main__':
         modelpath = os.path.join(params_path,f'model.pth')
 
     #加载模型
-    model = ModVAR(args).to(device)
+    model = TrajAR(args).to(device)
     
     total_params, total_trainable_params = model.params_num()
     print(f'total_params:{total_params}    total_trainable_params:{total_trainable_params}')
