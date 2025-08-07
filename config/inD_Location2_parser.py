@@ -49,8 +49,6 @@ def AddDataArgs(parser):
 
     parser.add_argument("--data_root", default='./data/inD-Location2', type=str)
 
-    parser.add_argument("--dataset", default='inD-Location2', type=str)
-
     parser.add_argument("--his_len",default=32, type=int)
 
     parser.add_argument("--predict_len", default=32, type=int)
@@ -83,8 +81,7 @@ def AddTrainArgs(parser):
     parser.add_argument("--patience", default=6, type=int)
 
 
-def Location2_InitArgs():
-    parser = argparse.ArgumentParser()
+def Location2_InitArgs(parser):
     
     parser.add_argument("--model_root", default='./logs', type=str,
                                 help="Log root directory")
@@ -93,7 +90,7 @@ def Location2_InitArgs():
 
     parser.add_argument("--save_result" , default=True, type=bool)
 
-    parser.add_argument("--ctx" , default=2, type=int)
+    parser.add_argument("--ctx" , default=0, type=int)
 
     AddDataArgs(parser)
 
