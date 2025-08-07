@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+import argparse
 torch.set_default_tensor_type(torch.DoubleTensor)
 from utils import check_dir
 from utils import get_time_str
@@ -20,7 +21,7 @@ import warnings
 warnings.filterwarnings("ignore")
 random_str = lambda : ''.join(random.sample(string.ascii_letters + string.digits, 6))
 
-# 设置随机种子
+# Set random seed
 randomSeed = 2046
 torch.manual_seed(randomSeed)
 torch.cuda.manual_seed(randomSeed)
@@ -56,7 +57,7 @@ def TrainEpoch(device, loader, model, optim, loss_fn, need_step, is_training):
             loss.backward()
             optim.step()
   
-    # 计算每个batch的平均损失
+    # Compute the average loss per batch
     loss_item /= count
     return loss_item
 
@@ -81,7 +82,7 @@ def ValidEpoch(device, loader, model, is_training):
             dist = torch.mean(torch.mean(torch.sqrt(torch.sum(xy_diff ** 2, dim=2)), dim=1))
             loss_item += dist.item()
             count += 1
-        # 计算每个batch的平均损失
+        # Compute the average loss per batch
         loss_item /= count
         return loss_item
 
@@ -110,18 +111,18 @@ def TestEpoch(loader, model, save, is_training):
         fde_targets = np.array(targets)[:,:,-1,:] # (batch_num, bs, 2)
         fde_predicts = np.array(predicts)[:,:,-1,:]
         
-        # 计算每个样本在每个时间步上预测值与目标值之间的欧几里得距离
+        # Compute Euclidean distance between prediction and ground truth at each timestep
         ade_distances = np.linalg.norm(ade_predicts - ade_targets, axis=-1)
-        # 对每个样本在时间步维度上求平均，得到每个样本的ADE
+        # Average over timesteps to get per-sample ADE
         ade_per_sample = np.mean(ade_distances, axis=-1)
-        # 对所有样本求平均，得到最终的ADE指标
+        # Average over samples to get final ADE metric
         final_ade = np.mean(ade_per_sample)
 
-        # 计算每个样本在每个时间步上预测值与目标值之间的欧几里得距离
+        # Compute Euclidean distance between prediction and ground truth at each timestep
         fde_distances = np.linalg.norm(fde_predicts - fde_targets, axis=-1)
-        # 对每个样本在时间步维度上求平均，得到每个样本的ADE
+        # Average over timesteps to get per-sample ADE
         fde_per_sample = np.mean(fde_distances, axis=-1)
-        # 对所有样本求平均，得到最终的ADE指标
+        # Average over samples to get final ADE metric
         final_fde = np.mean(fde_per_sample)
 
 
@@ -185,7 +186,7 @@ def Train(args, model, device):
             ade, fde = TestEpoch(test_loader, model, save=False, is_training=False)
 
             print(f"[Test][prediction] epoch {epoch} ade:{ade} fde:{fde}")
-        # 应该放在优化器更新参数之后，每个epoch更新学习率
+        # Learning rate scheduler step should follow optimizer update each epoch
         scheduler.step()
         print(f"[Scheduler] epoch {epoch} lr:{optim.param_groups[0]['lr']}")
 
@@ -203,11 +204,23 @@ def Train(args, model, device):
 
 if __name__ == '__main__':
     
-    args = Tianjin_InitArgs() # 修改args函数读取不同数据集对应的参数
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", default='SinD-Tianjin', type=str, help="[SinD-Tianjin, SinD-Xian, inD-Location1, inD-Location2")
+    args = parser.parse_args()
+    read_data = args.dataset
+    if read_data == 'SinD-Tianjin':
+        args = Tianjin_InitArgs(parser)
+    elif read_data == 'SinD-Xian':
+        args = Xian_InitArgs(parser)
+    elif read_data == 'inD-Location1':
+        args = Location1_InitArgs(parser)
+    elif read_data == 'inD-Location2':
+        args = Location2_InitArgs(parser)
+    
     use_nni = args.nni
     ctx = args.ctx
     device = torch.device(f'cuda:{ctx}' if torch.cuda.is_available() else "cpu")
-    # 超参数设置
+    # Hyperparameter settings
     if use_nni:
         params = nni.get_next_parameter()
         args.mtp_num_layers = params['mtp_num_layers']
@@ -234,14 +247,14 @@ if __name__ == '__main__':
     args.TrajAR_feed_dim = int(embed_scale * args.TrajAR_feed_dim)
     args.TrajAR_out_dim = int(embed_scale * args.TrajAR_out_dim)
     
-    #加载数据
+    #Load data
     print('start load data')
     data_module = LitDataModule(args)
     train_loader = data_module.train_dataloader()
     valid_loader = data_module.val_dataloader()
     test_loader = data_module.test_dataloader()
     print('End load data')
-    #设置日志地址
+    #Set log path
     modelpath = ''
     if use_nni:
         params_path = args.model_root
@@ -254,7 +267,7 @@ if __name__ == '__main__':
         check_dir(params_path,mkdir=True)
         modelpath = os.path.join(params_path,f'model.pth')
 
-    #加载模型
+    #Load model
     model = TrajAR(args).to(device)
     
     total_params, total_trainable_params = model.params_num()
@@ -262,7 +275,7 @@ if __name__ == '__main__':
     print('start training model')
     Train(args, model, device)
 
-    #保存模型
+    #Save model
     model.save(modelpath)
 
 

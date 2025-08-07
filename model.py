@@ -3,7 +3,8 @@ import torch
 import torch.nn.functional as F
 import time
 from utils import cubic_spline_interpolation
-# MOE共享专家和独立专家
+
+# MOE Shared and Independent Experts
 class SharedExpert(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(SharedExpert, self).__init__()
@@ -25,14 +26,15 @@ class IndependentExpert(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-# 混合专家模型
+
+# Mixture of Experts Model
 class MOEModel(nn.Module):
     def __init__(self, top_k, num_shared_experts, num_independent_experts, input_dim, hidden_dim, output_dim):
         super(MOEModel, self).__init__()
         self.num_independent_experts = num_independent_experts
         self.output_dim = output_dim
         self.topk = top_k
-        # Shared experts: one for each category (e.g.,机动车, 非机动车, 行人)
+        # Shared experts: one for each category (e.g., vehicle, non-vehicle, pedestrian)
         self.shared_experts = nn.ModuleList([SharedExpert(input_dim, hidden_dim, output_dim) for _ in range(num_shared_experts)])
         # Independent experts
         self.independent_experts = nn.ModuleList([IndependentExpert(input_dim, hidden_dim, output_dim) for _ in range(num_independent_experts)])
@@ -59,11 +61,11 @@ class MOEModel(nn.Module):
         
         # Select shared expert based on object type
         object_types = object_types.view(-1,3,1)  # (batch_size * num_nodes * his_len,3,1)
-        # 生成选择共享专家的掩码矩阵 (batch_size * num_nodes * his_len, 3, output_dim)
+        # Generate a mask matrix to select shared experts (batch_size * num_nodes * his_len, 3, output_dim)
         obj_type_flat = object_types.repeat(1,1,self.output_dim).view(-1,3,self.output_dim)  
-        # 先得到共享专家的全部输出 (batch_size * num_nodes * his_len, 3, output_dim)
+        # First, get the full output of the shared experts (batch_size * num_nodes * his_len, 3, output_dim)
         shared_expert_outputs = torch.stack([expert(x_flat) for expert in self.shared_experts], dim=1)
-        # 然后根据obj_type_flat选择对应的共享专家输出 (batch_size * num_nodes * his_len, output_dim)
+        # Then, select the corresponding shared expert output according to obj_type_flat (batch_size * num_nodes * his_len, output_dim)
         shared_expert_output = torch.mul(shared_expert_outputs,obj_type_flat).sum(dim=1)
         
         # Get independent expert outputs 
@@ -80,7 +82,7 @@ class MOEModel(nn.Module):
         output = output.view(batch_size, num_nodes, his_len, -1)
         return output
     
-# 旋转位置编码
+# Rotary Position Embedding
 class RotaryPositionEmbedding(nn.Module):
     def __init__(self, pos_dim):
         super(RotaryPositionEmbedding, self).__init__()
@@ -144,7 +146,7 @@ class MTP_Mask_Attention(nn.Module):
         K = K.view(K.size(0), -1, self.nhead, self.head_dim).transpose(1, 2)
         V = V.view(V.size(0), -1, self.nhead, self.head_dim).transpose(1, 2)
         
-        # 构造mask矩阵 (batch_size * num_node, nhead, seq_len, seq_len)
+        # Construct mask matrix (batch_size * num_node, nhead, seq_len, seq_len)
         mask2 = torch.transpose(mask, 2, 3)
         causal_mask = torch.matmul(mask,mask2)
         causal_mask = causal_mask.view(-1, his_len, his_len).unsqueeze(1)
@@ -429,22 +431,22 @@ class TrajAR(nn.Module):
         self.TrajAR_feed_dim = args.TrajAR_feed_dim
         self.TrajAR_dropout = args.TrajAR_dropout
         self.TrajAR_out_dim = args.TrajAR_out_dim
-        #轨迹初始特征编码器
+        # Trajectory initial feature encoder
         self.init_traj_enc = TrajFeatEncoder(self.node_num, self.dynamic_feat_num, self.light_num, self.input_dim)
         # Motion Trend Perception Transformer
         self.mtp_transformer = nn.ModuleList([MTP_TransformerEncoder(self.input_dim, self.mtp_feed_dim, self.mtp_num_heads) \
                                               for _ in range(self.mtp_num_layers)])
-        # MOE模型
+        # MOE model
         self.moe_model = MOEModel(top_k=self.moe_topk, num_shared_experts=self.num_shared_experts, num_independent_experts=self.num_independent_experts, \
                                   input_dim=self.input_dim, hidden_dim=self.moe_hid_dim, output_dim=self.moe_out_dim)
     
-        # GAT模型 (batch_size, his_len, gat_out_dim)
+        # GAT model (batch_size, his_len, gat_out_dim)
         self.gatlayer = GAT_Model(self.moe_out_dim, self.gat_out_dim, self.gat_num_heads)
 
         # ESA-Transformermox (batch_size, his_len, gat_out_dim)
         self.esa_model = ESA_TransformerEncoder(self.gat_out_dim, self.esa_num_heads, self.esa_feed_dim, \
                                                 self.esa_dropout, self.esa_num_layers)
-        # 残差连接编码器
+        # Residual connection encoder
         self.esaout_resnet = nn.Linear(in_features=self.input_dim, out_features=self.gat_out_dim)
         
         # TrajAR-Trajectory-embedding
@@ -470,35 +472,35 @@ class TrajAR(nn.Module):
         global device
         device = my_device
        
-        # 对轨迹点编码 (batch_size, node_num, inp_seq_len, input_dim)
+        # Encode trajectory points (batch_size, node_num, inp_seq_len, input_dim)
         x_agent_type = torch.mul(x_agent_type, graph_mask).type(torch.LongTensor).to(device)
         x_dynamic_enc, x_light_enc, x_agent_enc = self.init_traj_enc(x_dynamic, x_light, x_agent_type)
         origin_x_dynamic = x_dynamic_enc.clone()
         x_dynamic_ego = x_dynamic_enc[:, 0, :, :].to(device)
        
-        # 对轨迹点的位置和动态特征做Transformer编码 (batch_size, node_num, inp_seq_len, input_dim)
+        # Transformer encodes the position and dynamic features of the trajectory points (batch_size, node_num, inp_seq_len, input_dim)
         for mtp_model in self.mtp_transformer:
             x_dynamic_enc = mtp_model(x_dynamic_enc, graph_mask)
        
-        # 轨迹特征、信号灯特征和交通参与者类型特征融合
+        # Fuse trajectory features, signal light features, and traffic participant type features
         fuse_x = x_dynamic_enc + x_light_enc + x_agent_enc
         
-        # MOE建模优先级表示 (batch_size, num_nodes, his_len, moe_out_dim)
+        # MOE models priority representation (batch_size, num_nodes, his_len, moe_out_dim)
         moe_output = self.moe_model(fuse_x, object_types)
        
-        # GAT建模空间相关性 (batch_size, his_len, gat_out_dim)
+        # GAT models spatial correlation (batch_size, his_len, gat_out_dim)
         gat_output = self.gatlayer(moe_output, graph_node_dis, graph_mask)
        
-        # ESA-Transformer建模环境感知 (batch_size, his_len, gat_out_dim)
+        # ESA-Transformer models environment perception (batch_size, his_len, gat_out_dim)
         esa_output = self.esa_model(gat_output)
        
-        # 残差连接
+        # Residual connection
         esa_output = self.esaout_resnet(x_dynamic_ego) + esa_output
         
-        # 训练TrajAR
+        # Train TrajAR
         final_future_embed = self.final_traj_embed(esa_output.permute(0,2,1)).contiguous()
         final_future_embed = final_future_embed.view(batch_size,1,self.gat_out_dim)
-        # 第一次自回归 生成最后一个轨迹点
+        # First autoregression, generating the last trajectory point
         padding_embed = torch.zeros((batch_size, 62, self.gat_out_dim), device = x_dynamic.device, dtype=torch.float64)
         AR_embed1 = torch.cat([esa_output, final_future_embed, padding_embed], dim = 1)
         AR_causal_mask1 = torch.zeros((batch_size, inp_his_len+63, inp_his_len+63), device = x_dynamic.device, dtype=torch.float64)
@@ -509,7 +511,7 @@ class TrajAR(nn.Module):
         out_traj_xy = self.out_linear2(TrajAR_out1)
         pred_xy1 = out_traj_xy[:,inp_his_len:inp_his_len+1,:]
         pred_xy1_embed = TrajAR_out1[:,inp_his_len:inp_his_len+1,:] # 维度没有改变
-        # 第二次自回归 生成第16和32轨迹点
+        # Second autoregression, generating the 16th and 32nd trajectory points
         pre_interpolation_feat1 = torch.stack([x_dynamic[:, 0, 0, :2], x_dynamic[:, 0, -1, :2], pred_xy1.squeeze()], dim = 1)
         interpolation_mat1 = cubic_spline_interpolation(pre_interpolation_feat1, 1)[:, 3:, :]
         interpolation_embed1 = self.traj_embed(interpolation_mat1)
@@ -523,7 +525,7 @@ class TrajAR(nn.Module):
         pred_xy2_embed = TrajAR_out2[:,inp_his_len+1:inp_his_len+3,:]
         out_traj_xy2 = self.out_linear2(TrajAR_out2)
         pred_xy2 = out_traj_xy2[:,inp_his_len+1:inp_his_len+3,:]
-        # 第三次自回归 生成第8、16、24和32轨迹点
+        # Third autoregression, generating the 8th, 16th, 24th, and 32nd trajectory points
         pre_interpolation_feat2 = torch.cat([x_dynamic[:, 0, -1, :2].unsqueeze(1), pred_xy2], dim = 1)
         interpolation_mat2 = cubic_spline_interpolation(pre_interpolation_feat2, 1)[:, 1:, :]
         interpolation_embed2 = self.traj_embed(interpolation_mat2)
@@ -537,7 +539,7 @@ class TrajAR(nn.Module):
         pred_xy3_embed = TrajAR_out3[:,inp_his_len+3:inp_his_len+7,:]
         out_traj_xy3 = self.out_linear2(TrajAR_out3)
         pred_xy3 = out_traj_xy3[:,inp_his_len+3:inp_his_len+7,:]
-        # 第四次自回归 生成第4、8、12、16、20、24、28和32轨迹点
+        # Fourth autoregression, generating the 4th, 8th, 12th, 16th, 20th, 24th, 28th, and 32nd trajectory points
         pre_interpolation_feat3 = torch.cat([x_dynamic[:, 0, -1, :2].unsqueeze(1), pred_xy3], dim = 1)
         interpolation_mat3 = cubic_spline_interpolation(pre_interpolation_feat3, 1)[:, 1:, :]
         interpolation_embed3 = self.traj_embed(interpolation_mat3)
@@ -551,7 +553,7 @@ class TrajAR(nn.Module):
         pred_xy4_embed = TrajAR_out4[:,inp_his_len+7:inp_his_len+15,:]
         out_traj_xy4 = self.out_linear2(TrajAR_out4)
         pred_xy4 = out_traj_xy4[:,inp_his_len+7:inp_his_len+15,:]
-        # 第五次自回归 生成第2、4、6、8、10、12、14、16、18、20、22、24、26、28、30和32轨迹点
+        # Fifth autoregression, generating the 2nd, 4th, 6th, 8th, 10th, 12th, 14th, 16th, 18th, 20th, 22nd, 24th, 26th, 28th, and 30th trajectory points
         pre_interpolation_feat4 = torch.cat([x_dynamic[:, 0, -1, :2].unsqueeze(1), pred_xy4], dim = 1)
         interpolation_mat4 = cubic_spline_interpolation(pre_interpolation_feat4, 1)[:, 1:, :]
         interpolation_embed4 = self.traj_embed(interpolation_mat4)
@@ -566,7 +568,7 @@ class TrajAR(nn.Module):
         pred_xy5_embed = TrajAR_out5[:,inp_his_len+15:inp_his_len+31,:]
         out_traj_xy5 = self.out_linear2(TrajAR_out5)
         pred_xy5 = out_traj_xy5[:,inp_his_len+15:inp_his_len+31,:]
-        # 第六次自回归 生成所有轨迹点
+        # Sixth autoregression, generating all trajectory points
         pre_interpolation_feat5 = torch.cat([x_dynamic[:, 0, -1, :2].unsqueeze(1), pred_xy5], dim = 1)
         interpolation_mat5 = cubic_spline_interpolation(pre_interpolation_feat5, 1)[:, 1:, :]
         interpolation_embed5 = self.traj_embed(interpolation_mat5)
@@ -595,7 +597,7 @@ class TrajAR(nn.Module):
     
 
     def grad_state_dict(self):
-        # 筛选出 requires_grad=True 的参数
+        
         params_to_save = filter(lambda p: p[1].requires_grad, self.named_parameters())
         save_list = [p[0] for p in params_to_save]
         return  {name: param.detach() for name, param in self.state_dict().items() if name in save_list}
@@ -612,13 +614,10 @@ class TrajAR(nn.Module):
         self.load_state_dict(loaded_params,strict=False)
     
     def params_num(self):
-        total_params = sum(p.numel() for p in self.parameters()) # torch.numel()返回张量的元素个数
+        total_params = sum(p.numel() for p in self.parameters())
         total_params += sum(p.numel() for p in self.buffers())
         
         total_trainable_params = sum(
             p.numel() for p in self.parameters() if p.requires_grad)
         
         return total_params, total_trainable_params
-
-
-    

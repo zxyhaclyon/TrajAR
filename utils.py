@@ -47,42 +47,42 @@ class MinMaxScaler():
         data = 1. * data * (self._max - self._min) + self._min
         return data
 
-# 定义三次样条插值函数
+# Define cubic spline interpolation function
 def cubic_spline_interpolation(input_tensor, num_interp_points):
     """
-    :param input_tensor: 输入张量，形状为 (batch_size, num_points, xy_coords)
-    :param num_interp_points: 每两个点之间的插值点数量
-    :return: 插值后的张量
+    :param input_tensor: Input tensor with shape (batch_size, num_points, xy_coords)
+    :param num_interp_points: Number of interpolation points between each pair of points
+    :return: Interpolated tensor
     """
     batch_size, num_points, _ = input_tensor.shape
     device = input_tensor.device
     
-    # 将输入张量转换为 NumPy 数组（因为 scipy 不支持 PyTorch 张量）
+        # Convert the input tensor to a NumPy array
     if input_tensor.requires_grad:
         input_tensor = input_tensor.detach()
     input_np = input_tensor.cpu().numpy()
     
-    # 初始化输出列表
+    # Initialize the output list
     interp_results = []
     
     for sample in input_np:
-        x = sample[:, 0]  # 提取 x 坐标
-        y = sample[:, 1]  # 提取 y 坐标
+        x = sample[:, 0]  # Extract x coordinates
+        y = sample[:, 1]  # Extract y coordinates
         
-        # 创建三次样条插值对象
-        cs_x = CubicSpline(np.arange(num_points), x)  # 对 x 坐标插值
-        cs_y = CubicSpline(np.arange(num_points), y)  # 对 y 坐标插值
+        # Create cubic spline interpolation objects
+        cs_x = CubicSpline(np.arange(num_points), x)  # Interpolate x coordinates
+        cs_y = CubicSpline(np.arange(num_points), y)  # Interpolate y coordinates
         
-        # 生成插值点
+        # Generate interpolation points
         if num_interp_points == 1:
             interp_indices = np.linspace(0, num_points - 1, 2 * num_points - 1)
         interp_x = cs_x(interp_indices)
         interp_y = cs_y(interp_indices)
         
-        # 合并插值结果
+        # Merge interpolation results
         interp_sample = np.stack([interp_x, interp_y], axis=-1)
         interp_results.append(interp_sample)
     
-    # 将结果转换为 PyTorch 张量
+    # Convert the results back to a PyTorch tensor
     interp_tensor = torch.tensor(np.array(interp_results), dtype=torch.float64, device=device)
     return interp_tensor

@@ -24,7 +24,7 @@ def create_directories(data_folder):
     sub_dirs = ['observation', 'target']
     for d in top_dirs:
         top_dir = f'{root}/{d}'
-        if os.path.exists(top_dir):  # and overwrite:
+        if os.path.exists(top_dir):
             continue
         for s in sub_dirs:
             sub_dir = f'{top_dir}/{s}'
@@ -111,7 +111,7 @@ def get_target_features(df, frame_start, frame_end, n_features, agent_ltype, x0,
     
     feat_stack = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3, light4, light5, \
                            light6, light7, light8, agent_ltype), axis=1)
-    # 待预测节点和其邻居节点的轨迹长度不一，缺失的地方用NAN代替
+  
     return_array[0:feat_stack.shape[0], :] = feat_stack
     return return_array
 
@@ -147,7 +147,6 @@ def get_adjusted_features(df, frame_start, frame_end, n_features, x0=0., y0=0., 
     feat_stack = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3, light4, light5, \
                            light6, light7, light8, agent_ltype), axis=1)
     
-    # 待预测节点和其邻居节点的轨迹长度不一，缺失的地方用NAN代替
     return_array[0:feat_stack.shape[0], :] = feat_stack
     return return_array
 
@@ -253,7 +252,7 @@ def get_frame_split(n_frames):
 def which_set(v_frames, tr, val, test, time_len):
     assert v_frames[-1] > v_frames[0]
     curr = dict()
-    # 如果在训练集阶段开始的frame
+    # if the frame starts in training set
     if v_frames[0] >= tr[0] and v_frames[0] <= tr[-1]:
         if v_frames[-1] <= tr[-1]:
             curr['training'] = [0, v_frames[-1] - v_frames[0]]
@@ -268,7 +267,7 @@ def which_set(v_frames, tr, val, test, time_len):
                 curr['training'] = [0, val[0] -v_frames[0] - 1]
             if (v_frames[-1] - test[0] + 1) >= time_len:
                 curr['testing'] = [test[0] - v_frames[0], v_frames[-1] - v_frames[0]]
-    # 如果在验证集阶段开始的frame
+    # if the frame starts in validation set
     if v_frames[0] >= val[0] and v_frames[0] <= val[-1]:
         if v_frames[-1] <= val[-1]:
             curr['validation'] = [0, v_frames[-1] - v_frames[0]]
@@ -277,7 +276,7 @@ def which_set(v_frames, tr, val, test, time_len):
                 curr['validation'] = [0, test[0] - v_frames[0] - 1]
             if (v_frames[-1] - test[0] + 1) >= time_len:
                 curr['testing'] = [test[0] - v_frames[0], v_frames[-1] - v_frames[0]]
-    # 如果在测试集阶段开始的frame
+    # if the frame starts in test set
     if v_frames[0] >= test[0] and v_frames[-1] <= test[-1]:
         curr['testing'] = [0, v_frames[-1] - v_frames[0]]
     return curr
@@ -314,9 +313,9 @@ if __name__ == "__main__":
         t_meta = pd.read_csv(f'{SEARCH_PATH}/{r_id}_tracksMeta.csv')
         tracks = pd.read_csv(f'{SEARCH_PATH}/{r_id}_tracks.csv', engine='pyarrow')
         # Perform some initial cleanup
-        tracks, t_meta = remove_parked_vehicles(tracks, t_meta) # 去除停放的车辆数据
+        tracks, t_meta = remove_parked_vehicles(tracks, t_meta) # remove parked vehicles
         if r_id == '04':
-            tracks, t_meta = remove_still_vehicle(tracks, t_meta, (141,)) # 去除停止时间超过10秒的车辆数据，第三个元组是时间超出但移动的Track-ID
+            tracks, t_meta = remove_still_vehicle(tracks, t_meta, (141,)) # remove vehicles stopped for over 10 seconds，third element is Track-ID that exceeds time but moved
             tracks = remove_parts(tracks, (141,), (120,))
         elif r_id == '06':
             tracks, t_meta = remove_still_vehicle(tracks, t_meta, (0,))
@@ -332,19 +331,18 @@ if __name__ == "__main__":
 
         # Determine tr, val, test split (by frames)
         all_frame = max(tracks['frame'].values)
-        train_frames, val_frames, test_frames = get_frame_split(all_frame) # 按照8:1:1划分数据集（设置随机采样区间）
+        train_frames, val_frames, test_frames = get_frame_split(all_frame) # according to照8:1:1split dataset（设置随机采样区间）
 
         # Get data and store
-        # car_ids = list(t_meta[t_meta['class'].isin(['car', 'truck', 'van'])].trackId)
         all_ids = list(set(list(tracks['trackId'].values))) 
         ii = tqdm(range(0, len(all_ids)))
         for tri in ii:
             id0 = all_ids[tri]
-            # 确定当前trackId的车辆类型
+            # Determine the vehicle type of the current trackId
             agent_type = t_meta[t_meta.trackId == id0]['class'].iloc[0]
             df = tracks[tracks.trackId == id0]
             frames = list(df.frame)
-            # 如果一个车辆的轨迹没有达到满足的时间总窗口长度则舍去
+            # Filter out the data whose sequence lengths do not match
             if len(frames) < (INPUT_LENGTH + PRED_HORIZON):
                 continue
             time_len = INPUT_LENGTH + PRED_HORIZON
@@ -356,13 +354,13 @@ if __name__ == "__main__":
                 start_index = indexl[0]
                 end_index =  indexl[-1]
                 sub_frames = frames[start_index : end_index+1]
-                for f in sub_frames[0:-time_len+1:fz*2]: # 对满足长度的车辆轨迹做滑窗处理
+                for f in sub_frames[0:-time_len+1:fz*2]: # slide window for valid trajectories
                     fp = f + INPUT_LENGTH - 1
                     fT = fp + PRED_HORIZON
                     x, y, vx, vy, ax, ay, light1, light2, light3, \
-                    light4, light5, light6, light7, light8 = get_input_features(df, f, fp) # 历史窗口的特征作为输入
+                    light4, light5, light6, light7, light8 = get_input_features(df, f, fp) # features of historical window as input
                     agent_ltype = [agent_dict[agent_type] for i in range(len(x))]
-                    neighbors = find_neighboring_nodes(tracks, fp, id0, x[-1], y[-1]) # 在历史窗口的最后一个帧根据距离选择邻居（可改进）
+                    neighbors = find_neighboring_nodes(tracks, fp, id0, x[-1], y[-1]) # select neighbors based on distance at last frame of history（可改进）
                     n_SVs = len(neighbors)
                     sv_ids = [int(neighbors[n][1]) for n in range(n_SVs)]
                     euc_dist = [int(neighbors[n][0]) for n in range(n_SVs)]
@@ -370,12 +368,12 @@ if __name__ == "__main__":
 
                     x0 = p0[0]  # x[0]
                     y0 = p0[1]  # y[0]
-                    # 由绝对坐标改成相对于原点的坐标
+                    # convert absolute coordinates to relative to origin
                     x = [round(xx - x0, 4) for xx in x]
                     y = [round(yy - y0, 4) for yy in y]
                     
-                    # 构建输入输出矩阵
-                    input_array = np.full((15, 32, N_IN_FEATURES), -1, dtype = np.float64) # 输入输出向量维度确定
+                    # build input and output matrices
+                    input_array = np.full((15, 32, N_IN_FEATURES), -1, dtype = np.float64) # determine input/output tensor dimensions
                     target_array = np.empty((32, N_OUT_FEATURES), dtype = np.float64)
 
                     input_array[0, :, :] = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3,
@@ -431,7 +429,7 @@ if __name__ == "__main__":
 
                     s_dict[curr_set] += 1
         
-        # 一段采集时间代表一个文件
+        # each recording interval is treated as one file
         if not os.path.exists(f'./data/{data_root}/training/observation/{r_id}'):
             os.mkdir(f'./data/{data_root}/training/observation/{r_id}')
             os.mkdir(f'./data/{data_root}/training/target/{r_id}')

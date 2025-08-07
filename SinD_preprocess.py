@@ -70,7 +70,6 @@ def get_input_features(df, frame_start, frame_end):
     dfx = df[(df.frame_id >= frame_start) & (df.frame_id <= frame_end)]
     x = list(map(lambda x:round(x,4), dfx.x.values))
     y = list(map(lambda x:round(x,4), dfx.y.values))
-    # 对xy坐标做归一化
     vx = list(map(lambda x:round(x,4), dfx.vx.values))
     vy = list(map(lambda x:round(x,4), dfx.vy.values))
     ax = list(map(lambda x:round(x,4), dfx.ax.values))
@@ -110,7 +109,7 @@ def get_target_features(df, frame_start, frame_end, n_features):
     
     feat_stack = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3, light4, light5, \
                            light6, light7, light8, agent_type), axis=1)
-    # 待预测节点和其邻居节点的轨迹长度不一，缺失的地方用NAN代替
+    
     return_array[0:feat_stack.shape[0], :] = feat_stack
     return return_array
 
@@ -142,7 +141,7 @@ def get_adjusted_features(df, frame_start, frame_end, n_features, trackId = -1):
     
     feat_stack = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3, light4, light5, \
                            light6, light7, light8, agent_type), axis=1)
-    # 待预测节点和其邻居节点的轨迹长度不一，缺失的地方用NAN代替
+
     return_array[frame_offset:frame_offset + feat_stack.shape[0], :] = feat_stack
     return return_array
 
@@ -196,7 +195,7 @@ def get_frame_split(n_frames):
 def which_set(v_frames, tr, val, test, time_len):
     assert v_frames[-1] > v_frames[0]
     curr = dict()
-    # 如果在训练集阶段开始的frame
+    # if the frame starts in training set
     if v_frames[0] >= tr[0] and v_frames[0] <= tr[-1]:
         if v_frames[-1] <= tr[-1]:
             curr['training'] = [0, v_frames[-1] - v_frames[0]]
@@ -211,7 +210,7 @@ def which_set(v_frames, tr, val, test, time_len):
                 curr['training'] = [0, val[0] -v_frames[0] - 1]
             if (v_frames[-1] - test[0] + 1) >= time_len:
                 curr['testing'] = [test[0] - v_frames[0], v_frames[-1] - v_frames[0]]
-    # 如果在验证集阶段开始的frame
+    # if the frame starts in validation set
     if v_frames[0] >= val[0] and v_frames[0] <= val[-1]:
         if v_frames[-1] <= val[-1]:
             curr['validation'] = [0, v_frames[-1] - v_frames[0]]
@@ -220,7 +219,7 @@ def which_set(v_frames, tr, val, test, time_len):
                 curr['validation'] = [0, test[0] - v_frames[0] - 1]
             if (v_frames[-1] - test[0] + 1) >= time_len:
                 curr['testing'] = [test[0] - v_frames[0], v_frames[-1] - v_frames[0]]
-    # 如果在测试集阶段开始的frame
+    # if the frame starts in test set
     if v_frames[0] >= test[0] and v_frames[-1] <= test[-1]:
         curr['testing'] = [0, v_frames[-1] - v_frames[0]]
     return curr
@@ -237,7 +236,7 @@ def city_traffic_light(trafficlight, column, all_timestamp, add_count):
             tra_dict[(0, trl2[0])] = list(trl1[1:]) * add_count
         if trl1[0] >= 0 and trl2[0] > 0:
             tra_dict[(trl1[0], trl2[0])] = list(trl1[1:]) * add_count
-    # 加入最后时刻的信号灯状态
+    # Add the signal light status at the last moment
     trl1 = list(trafficlight.loc[ind+1][column])
     if all_timestamp > trl1[0]:
         tra_dict[(trl1[0], all_timestamp+1)] = list(trl1[1:]) * add_count
@@ -263,10 +262,10 @@ def track_light_concat(tracks, traffic_light_dict, if_veh):
             if start <= timestamp < end:
                 result = values
                 return result
-        print(f'{timestamp}没有匹配上信号灯状态')
-    # 应用函数到 DataFrame的每一行
+        print(f'the {timestamp} signal light status has not been matched')
+    
     results = ori_tracks['timestamp_ms'].apply(match_timestamp)
-    # 创建新的 8 个列
+    # Create new columns for the signal light status
     light_columns = [f'light{i}' for i in range(1, 9)]
     ori_tracks[light_columns] = pd.DataFrame(results.tolist(), index=ori_tracks.index)
     return ori_tracks
@@ -282,14 +281,11 @@ if __name__ == "__main__":
     City = args.city
     data_folder = args.data_save
     data_root = create_directories(data_folder)
-    # 指定要遍历的文件夹路径
+    # read data
     root_folder = args.data_read
     sub_folders = []
-    # 使用os.walk()遍历文件夹
     for root, dirs, files in os.walk(root_folder):
-        # 遍历子文件夹
         for dir in dirs:
-            # 子文件夹的完整路径
             sub_folder_path = os.path.join(root_folder, dir)
             sub_folders.append(sub_folder_path)
     np.random.seed(1234)
@@ -301,11 +297,10 @@ if __name__ == "__main__":
         test_data, test_edge_feat, test_mask, test_target, test_tp_types = [], [], [], [], []
         record_id = list(sub_folder.split('/'))[-1]
         print(f'Starting with recording {record_id}')
-        # 遍历文件夹中的数据集
+      
         file_name = []
         for root, dirs, files in os.walk(sub_folder):
             for file in files:
-                # 检查文件扩展名是否为.csv
                 if file.endswith('.csv'):
                     file_name.append(file)
         ped_tracks, veh_tracks, trafficlight = 0, 0, 0
@@ -318,13 +313,13 @@ if __name__ == "__main__":
                 trafficlight = pd.read_csv(f'{sub_folder}/{name}')
         all_frame = max([max(ped_tracks['frame_id'].values), max(veh_tracks['frame_id'].values)]) + 1
         all_timestamp = max([max(ped_tracks['timestamp_ms'].values), max(veh_tracks['timestamp_ms'].values)])
-         # 生成交通信号灯的动态变化字典 键为时间区间左闭右开 值为信号灯的离散状态为float类型
+         # generate dynamic dictionary of traffic lights
         traffic_light_dict = create_traffic_light_dict(trafficlight, City, all_timestamp)
-        # 将交通信号灯与轨迹做匹配
+        # match traffic light states with trajectory
         ped_tracks = track_light_concat(ped_tracks, traffic_light_dict, if_veh = False)
         veh_tracks = track_light_concat(veh_tracks, traffic_light_dict, if_veh = True)
         # Determine tr, val, test split (by frames)
-        train_frames, val_frames, test_frames = get_frame_split(all_frame) # 按照8:1:1划分数据集（设置随机采样区间）
+        train_frames, val_frames, test_frames = get_frame_split(all_frame) # according to照8:1:1split dataset（设置随机采样区间）
         his_len = 32
         future_len = 32
         time_len = his_len + future_len
@@ -340,10 +335,10 @@ if __name__ == "__main__":
             else:
                 df = veh_tracks[veh_tracks.track_id == id0]
             frames = list(df.frame_id)
-            # 不满足时间窗口长度的轨迹删除
+            # remove trajectories that do not meet time window
             if len(frames) < time_len: 
                 continue
-            # 轨迹划分数据集(可能长轨迹会划分进多个数据集)
+            # split dataset
             curr_split = which_set(frames, train_frames, val_frames, test_frames, time_len)
             if not curr_split:
                 # If a vehicle is within frames which are overlapping the sets
@@ -352,18 +347,18 @@ if __name__ == "__main__":
                 start_index = indexl[0]
                 end_index =  indexl[-1]
                 sub_frames = frames[start_index : end_index+1]
-                for f in sub_frames[0:-time_len+1:time_len]: # 对满足长度的车辆轨迹做滑窗处理
+                for f in sub_frames[0:-time_len+1:time_len]: # slide window for valid trajectories
                     fp = f + his_len - 1
                     fT = fp + future_len
                     x, y, vx, vy, ax, ay, light1, light2, light3, \
-                    light4, light5, light6, light7, light8, agent_type = get_input_features(df, f, fp) # 历史窗口的特征作为输入
-                    neighbors = find_neighboring_nodes(ped_tracks, veh_tracks, fp, id0, x[-1], y[-1]) # 在历史窗口的最后一个帧根据距离选择邻居（可改进）
+                    light4, light5, light6, light7, light8, agent_type = get_input_features(df, f, fp) # features of historical window as input
+                    neighbors = find_neighboring_nodes(ped_tracks, veh_tracks, fp, id0, x[-1], y[-1]) # select neighbors based on distance at last frame of history
                     n_SVs = len(neighbors)
                     sv_ids = [neighbors[n][1] for n in range(n_SVs)]
                     euc_dist = [int(neighbors[n][0]) for n in range(n_SVs)]
                     v_ids = [id0, *sv_ids]
 
-                    input_array = np.full((15, his_len, N_IN_FEATURES), -1, dtype = np.float64) # 输入输出向量维度确定
+                    input_array = np.full((15, his_len, N_IN_FEATURES), -1, dtype = np.float64) # determine input/output tensor dimensions
                     target_array = np.empty((future_len, N_OUT_FEATURES), dtype = np.float64)
 
                     input_array[0, :, :] = np.stack((x, y, vx, vy, ax, ay, light1, light2, light3,
@@ -376,7 +371,7 @@ if __name__ == "__main__":
                         else:
                             input_array[j + 1, :, :] = get_adjusted_features(veh_tracks, f, fp, N_IN_FEATURES, sv_id)
                 
-                    # 为交通参与者的类型划分机动车、非机动车和行人
+                    # classify agents into motorized, non-motorized and pedestrian
                     tp_type_array = np.zeros((15, his_len, 3, 1))
                     for row in range(15):
                         for lie in range(int(his_len)):
@@ -387,9 +382,7 @@ if __name__ == "__main__":
                             elif input_array[row, lie, -1] == 7:
                                 tp_type_array[row, lie] = np.array([[0], [0], [1]])
                     tp_type_array = torch.from_numpy(tp_type_array)
-                    # Build edge indices 
-                    # 为历史窗口的每一帧创建图结构，确定存在点在邻接矩阵中的索引关系
-                    # input_edge_index = build_seq_edge_idx(torch.tensor(input_array)) # his_len * 2* (exit_node**2)
+                    
                     # Build edge features
                     input_edge_feat = euclidian_sequence(input_array) # (his_len, node, 1)
 
@@ -422,8 +415,7 @@ if __name__ == "__main__":
                         test_tp_types.append(tp_type_array)
 
                     s_dict[curr_set] += 1
-        
-        # 一个城市的一段采集时间代表一个文件
+    
         torch.save(train_data, f'./data/{data_root}/training/observation/{record_id}/dat.pt')
         torch.save(train_mask, f'./data/{data_root}/training/observation/{record_id}/mask.pt')
         torch.save(train_edge_feat, f'./data/{data_root}/training/observation/{record_id}/edge_feat.pt')

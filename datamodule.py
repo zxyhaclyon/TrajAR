@@ -14,7 +14,7 @@ class LitDataModule():
         dataset = TrajectoryPredictionDataset('training',
                                               self.data_root,
                                               small=self.small_ds)
-        print('训练集的batch数量:', int(dataset.data_num / self.batch_size))
+        print('training dataset batch number:', int(dataset.data_num / self.batch_size))
         return torch.utils.data.DataLoader(dataset,
                           batch_size=self.batch_size,
                           shuffle=True,
@@ -25,7 +25,7 @@ class LitDataModule():
         dataset = TrajectoryPredictionDataset('validation',
                                               self.data_root,
                                               small=self.small_ds)
-        print('验证集的batch数量:', int(dataset.data_num / self.batch_size))
+        print('validation dataset batch number:', int(dataset.data_num / self.batch_size))
         return torch.utils.data.DataLoader(dataset,
                           batch_size=self.batch_size,
                           shuffle=False,
@@ -36,7 +36,7 @@ class LitDataModule():
         dataset = TrajectoryPredictionDataset('testing',
                                               self.data_root,
                                               small=self.small_ds)
-        print('测试集的batch数量:', int(dataset.data_num / self.batch_size))
+        print('testing dataset batch number:', int(dataset.data_num / self.batch_size))
         return torch.utils.data.DataLoader(dataset,
                           batch_size=self.batch_size,
                           shuffle=False,
@@ -51,7 +51,7 @@ class TrajectoryPredictionDataset(data.Dataset):
                  small: bool = False):
         self.mode = train_test
         self.root = data_set_src
-        # 遍历文件夹中的数据集
+        # Read the dataset in the folder
         obs_sub_folder = f'{self.root}/{self.mode}/observation'
         target_sub_folder = f'{self.root}/{self.mode}/target'
         input_data, nan_mask, node_adj, tp_types, target_data = [], [], [], [], [] 
