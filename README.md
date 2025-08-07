@@ -20,10 +20,10 @@ You need to modify the three parameters `city`(only SinD need), `data_read` and 
 
 ## Usage
 
-All the architectures of the TrajAR model are included in `Model.py`.  
-Different dataset training parameters correspond to different `parser.py` files in `./config` folder. Modify the `InitArgs` class on line 206 of main.py to correspond to different datasets.
+All the architectures of the TrajAR model are included in `Model.py`.  When training the model, set the hyperparameter `dataset` according to different datasets SinD-Tianjin, SinD-Xian, inD-Location1, and inD-Location2.
+
 ```bash
-python main.py --ctx
+python main.py --dataset SinD-Tianjin
 ```
 
 
