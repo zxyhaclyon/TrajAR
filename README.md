@@ -5,8 +5,8 @@ TrajAR: Long-Term Trajectory Prediction at Urban Intersections via Multi-scale I
 
 ## Data sets
 For model training and evaluation, the [SinD](https://github.com/SOTIF-AVLab/SinD/tree/main) and [inD](https://www.ind-dataset.com/) are used. In our experiments, we use four real-world datasets: SinD-Tianjin, SinD-Xian, InD-Bendplatz, and InDFrankenburg. The two SinD datasets record signalized intersections in Tianjin and Xian, China, at 10 Hz. The two InD datasets contain recorded trajectories of four types of road users from different intersections in Germany, with several hours recorded at 25 Hz.
-- Download processed datasets from the following sources:
-    - <a href='https://pan.baidu.com/s/1TuVVE3T90K2c-pbhBk2Oxw?pwd=68c6'>BaiduNetDisk</a> code: `68c6`
+- Download raw datasets from the following sources:
+    - <a href='https://pan.baidu.com/s/1N0c6XnXiskfe6NDGWkrq2g?pwd=atpr'>BaiduNetDisk</a> code: `atpr`
 
 ## Preprocessing
 
